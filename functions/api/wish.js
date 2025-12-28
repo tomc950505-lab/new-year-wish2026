@@ -4,11 +4,18 @@ export async function onRequest(context) {
 
     if (request.method === "POST") {
         try {
-            const { to, question, answer, msg } = await request.json();
+            const { to, from, question, answer, msg } = await request.json();
             const nameKey = to.toLowerCase().trim();
-            // 使用时间戳确保每封信独立
+            // 使用 ID 确保每封信独立：wish:收信人:时间戳
             const id = `wish:${nameKey}:${Date.now()}`;
-            const data = { id, to: nameKey, question, answer: answer.toLowerCase().trim(), message: msg };
+            const data = { 
+                id, 
+                to: nameKey, 
+                from: from || "神秘人", 
+                question, 
+                answer: answer.toLowerCase().trim(), 
+                message: msg 
+            };
             await env.WISH_STORAGE.put(id, JSON.stringify(data));
             return new Response(JSON.stringify({ success: true }), { headers: { "Content-Type": "application/json" } });
         } catch (e) {
@@ -23,11 +30,12 @@ export async function onRequest(context) {
 
         if (type === 'list') {
             const list = await env.WISH_STORAGE.list({ prefix: `wish:${name}` });
-            const questions = await Promise.all(list.keys.map(async (k) => {
+            const results = await Promise.all(list.keys.map(async (k) => {
                 const v = await env.WISH_STORAGE.get(k.name, { type: "json" });
-                return { id: k.name, question: v.question };
+                // 解锁前就返回 from 和 question
+                return { id: k.name, from: v.from, question: v.question };
             }));
-            return new Response(JSON.stringify(questions), { headers: { "Content-Type": "application/json" } });
+            return new Response(JSON.stringify(results), { headers: { "Content-Type": "application/json" } });
         }
 
         if (type === 'verify') {
@@ -35,7 +43,7 @@ export async function onRequest(context) {
             const ans = url.searchParams.get('answer')?.toLowerCase().trim();
             const data = await env.WISH_STORAGE.get(id, { type: "json" });
             if (data && data.answer === ans) {
-                return new Response(JSON.stringify({ success: true, message: data.message }), { headers: { "Content-Type": "application/json" } });
+                return new Response(JSON.stringify({ success: true, message: data.message, from: data.from }), { headers: { "Content-Type": "application/json" } });
             }
             return new Response(JSON.stringify({ success: false }), { headers: { "Content-Type": "application/json" } });
         }

@@ -6,7 +6,7 @@
     <title>2026新年 | 灵魂连接</title>
     <style>
         :root { --primary: #020205; --accent: #00f2fe; --gold: #fccb90; --glass: rgba(255, 255, 255, 0.05); }
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: var(--primary); color: white; font-family: 'Inter', sans-serif; overflow: hidden; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: var(--primary); color: white; font-family: sans-serif; overflow: hidden; }
         #fwCanvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
         .ui-wrapper { position: relative; z-index: 10; height: 100vh; display: flex; align-items: center; justify-content: center; pointer-events: none; }
         .glass-card { background: var(--glass); backdrop-filter: blur(25px); padding: 2rem; border-radius: 35px; border: 1px solid rgba(255, 255, 255, 0.1); width: 360px; text-align: center; pointer-events: auto; box-shadow: 0 25px 50px rgba(0,0,0,0.6); }
@@ -14,20 +14,21 @@
         .tab-group { display: flex; background: rgba(0,0,0,0.2); padding: 4px; border-radius: 15px; margin-bottom: 20px; }
         .tab-btn { flex: 1; padding: 10px; border: none; background: transparent; color: white; cursor: pointer; transition: 0.3s; opacity: 0.5; }
         .tab-btn.active { opacity: 1; background: var(--accent); color: #000; font-weight: bold; border-radius: 12px; }
-        input, textarea { width: 100%; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px; color: white; padding: 12px; margin: 8px 0; box-sizing: border-box; outline: none; }
+        input, textarea { width: 100%; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px; color: white; padding: 12px; margin: 6px 0; box-sizing: border-box; outline: none; }
         .btn-main { width: 100%; background: linear-gradient(45deg, var(--accent), #4facfe); color: #000; border: none; padding: 12px; border-radius: 10px; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        .wish-chip { background: rgba(0, 242, 254, 0.1); border: 1px solid var(--accent); padding: 10px; margin: 10px 0; border-radius: 10px; cursor: pointer; font-size: 0.9rem; transition: 0.3s; }
-        .wish-chip:hover { background: rgba(0, 242, 254, 0.2); }
-        .unlocked-msg { border-left: 2px solid var(--gold); padding: 10px; margin: 15px 0; color: var(--gold); font-style: italic; background: rgba(255,255,255,0.03); text-align: left; }
-        .music-ctrl { position: fixed; top: 20px; right: 20px; z-index: 100; cursor: pointer; pointer-events: auto; }
+        .wish-chip { background: rgba(0, 242, 254, 0.08); border: 1px solid rgba(0, 242, 254, 0.3); padding: 12px; margin: 10px 0; border-radius: 12px; cursor: pointer; text-align: left; transition: 0.3s; }
+        .wish-chip:hover { background: rgba(0, 242, 254, 0.2); border-color: var(--accent); }
+        .from-tag { color: var(--accent); font-size: 0.75rem; display: block; margin-bottom: 4px; font-weight: bold; }
+        .unlocked-msg { border-left: 3px solid var(--gold); padding: 12px; margin: 15px 0; color: var(--gold); font-style: italic; background: rgba(255,255,255,0.03); text-align: left; animation: slideIn 0.5s ease; }
+        @keyframes slideIn { from { transform: translateX(-10px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .music-ctrl { position: fixed; top: 20px; right: 20px; z-index: 100; cursor: pointer; pointer-events: auto; font-size: 24px; filter: drop-shadow(0 0 5px var(--accent)); }
     </style>
 </head>
 <body>
 
 <canvas id="fwCanvas"></canvas>
 <audio id="bgMusic" loop><source src="Time To Love - October.flac" type="audio/flac"></audio>
-
-<div class="music-ctrl" onclick="toggleMusic()" style="font-size: 24px;">🎵</div>
+<div class="music-ctrl" onclick="toggleMusic()">🎵</div>
 
 <div class="ui-wrapper">
     <div class="glass-card">
@@ -38,10 +39,11 @@
         </div>
 
         <div id="p-write">
+            <input type="text" id="from" placeholder="你的名字 (发信人)">
             <input type="text" id="to" placeholder="收信人姓名">
             <input type="text" id="q" placeholder="设置密保问题">
             <input type="text" id="a" placeholder="设置正确答案">
-            <textarea id="m" placeholder="写下心愿..." rows="3"></textarea>
+            <textarea id="m" placeholder="写下你想说的话..." rows="3"></textarea>
             <button class="btn-main" onclick="postWish()">锁定并发送 ✨</button>
         </div>
 
@@ -50,11 +52,13 @@
                 <input type="text" id="myName" placeholder="输入你的姓名">
                 <button class="btn-main" onclick="loadList()">查找我的愿望 ✉️</button>
             </div>
-            <div id="step-list" style="display:none; max-height:200px; overflow-y:auto;"></div>
+            <div id="step-list" style="display:none; max-height:250px; overflow-y:auto; padding-right:5px;"></div>
             <div id="step-verify" style="display:none;">
-                <p id="curQ" style="color:var(--accent); margin-bottom:10px;"></p>
+                <p id="curFrom" style="color:var(--accent); font-size:0.8rem; margin:0;"></p>
+                <p id="curQ" style="color:white; margin:10px 0; font-weight:bold;"></p>
                 <input type="text" id="myA" placeholder="输入答案">
                 <button class="btn-main" onclick="unlock()">验证并开启</button>
+                <button class="tab-btn" style="width:100%; margin-top:10px;" onclick="backToList()">返回列表</button>
             </div>
             <div id="resultBox"></div>
         </div>
@@ -72,12 +76,14 @@
 
     async function postWish() {
         const body = { 
+            from: document.getElementById('from').value.trim(),
             to: document.getElementById('to').value.trim(), 
             question: document.getElementById('q').value.trim(), 
             answer: document.getElementById('a').value.trim(), 
             msg: document.getElementById('m').value.trim() 
         };
-        if(!body.to || !body.msg) return alert("请填写完整");
+        if(!body.to || !body.msg || !body.question || !body.answer) return alert("请填写完整所有项");
+        
         const res = await fetch('/api/wish', { method: 'POST', body: JSON.stringify(body) });
         if(res.ok) { alert("愿望已成功封存！"); location.reload(); }
     }
@@ -88,18 +94,30 @@
         const res = await fetch(`/api/wish?type=list&name=${encodeURIComponent(name)}`);
         const data = await res.json();
         const listDiv = document.getElementById('step-list');
-        if(data.length === 0) { alert("暂无愿望"); return; }
         
-        listDiv.innerHTML = data.map((i, idx) => `<div class="wish-chip" onclick="goVerify('${i.id}','${i.question}')">谜题 ${idx+1}: ${i.question}</div>`).join('');
+        if(data.length === 0) { alert("暂无属于你的愿望"); return; }
+        
+        listDiv.innerHTML = data.map(i => `
+            <div class="wish-chip" onclick="goVerify('${i.id}','${i.from}','${i.question}')">
+                <span class="from-tag">来自：${i.from}</span>
+                <span>问题：${i.question}</span>
+            </div>
+        `).join('');
         document.getElementById('step-name').style.display = 'none';
         listDiv.style.display = 'block';
     }
 
-    function goVerify(id, q) {
+    function goVerify(id, from, q) {
         activeId = id;
-        document.getElementById('curQ').innerText = "问题：" + q;
+        document.getElementById('curFrom').innerText = "来自 " + from + " 的挑战：";
+        document.getElementById('curQ').innerText = q;
         document.getElementById('step-list').style.display = 'none';
         document.getElementById('step-verify').style.display = 'block';
+    }
+
+    function backToList() {
+        document.getElementById('step-verify').style.display = 'none';
+        document.getElementById('step-list').style.display = 'block';
     }
 
     async function unlock() {
@@ -110,11 +128,12 @@
         if(data.success) {
             const div = document.createElement('div');
             div.className = 'unlocked-msg';
-            div.innerText = `“${data.message}”`;
+            div.innerHTML = `<small style="color:var(--accent)">From ${data.from}:</small><br>“${data.message}”`;
             document.getElementById('resultBox').prepend(div);
             document.getElementById('step-verify').style.display = 'none';
             document.getElementById('step-list').style.display = 'block';
-        } else { alert("答案错误"); }
+            document.getElementById('myA').value = "";
+        } else { alert("答案错误，再想想？"); }
     }
 
     // 烟花动画
@@ -126,17 +145,18 @@
     window.addEventListener('mousedown', (e) => {
         if(e.target.closest('.glass-card')) return;
         const color = `hsl(${Math.random() * 360}, 80%, 70%)`;
-        for(let i=0; i<30; i++) {
-            particles.push({ x: e.clientX, y: e.clientY, vx: (Math.random()-0.5)*8, vy: (Math.random()-0.5)*8, color, alpha: 1 });
+        for(let i=0; i<35; i++) {
+            particles.push({ x: e.clientX, y: e.clientY, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10, color, alpha: 1 });
         }
-        document.getElementById('bgMusic').play().catch(()=>{});
+        const m = document.getElementById('bgMusic');
+        if(m.paused) m.play().catch(()=>{});
     });
     function animate() {
         ctx.fillStyle = 'rgba(2, 2, 5, 0.2)'; ctx.fillRect(0,0,canvas.width, canvas.height);
         particles.forEach((p, i) => {
-            p.x += p.vx; p.y += p.vy; p.alpha -= 0.01;
+            p.x += p.vx; p.y += p.vy; p.alpha -= 0.012;
             ctx.globalAlpha = p.alpha; ctx.fillStyle = p.color;
-            ctx.beginPath(); ctx.arc(p.x, p.y, 2, 0, 7); ctx.fill();
+            ctx.beginPath(); ctx.arc(p.x, p.y, 1.8, 0, 7); ctx.fill();
             if(p.alpha <= 0) particles.splice(i, 1);
         });
         requestAnimationFrame(animate);

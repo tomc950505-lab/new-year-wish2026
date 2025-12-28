@@ -1,94 +1,61 @@
-<style>
-    /* ... 保留原有样式 ... */
-    .wish-chip { 
-        background: rgba(255, 255, 255, 0.1); 
-        border: 1px solid var(--accent); 
-        padding: 10px; 
-        margin: 10px 0; 
-        border-radius: 10px; 
-        cursor: pointer; 
-        transition: 0.3s;
-    }
-    .wish-chip:hover { background: rgba(0, 242, 254, 0.2); }
-    .unlocked-msg { 
-        border-left: 2px solid var(--gold); 
-        padding-left: 10px; 
-        color: var(--gold); 
-        margin: 15px 0; 
-        animation: fadeIn 0.5s;
-    }
-    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-</style>
-
-<div id="panel-check" style="display:none;">
-    <div id="check-step1">
-        <input type="text" id="myName" placeholder="输入你的姓名">
-        <button class="btn-main" onclick="listWishes()">查看我的信箱 ✉️</button>
-    </div>
-    
-    <div id="wishList" style="margin-top:20px;"></div>
-
-    <div id="verifyArea" style="display:none; margin-top:20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top:20px;">
-        <p id="activeQuestion" style="color: var(--accent); font-size: 0.9rem;"></p>
-        <input type="text" id="activeAnswer" placeholder="输入这封信的答案">
-        <button class="btn-main" onclick="unlockWish()">开启这封信</button>
-    </div>
-    
-    <div id="resultBox"></div>
-</div>
-
 <script>
-    /* ... 保留 switchTab 和 sendWish ... */
+    // ... 保留 switchTab 和 sendWish 函数 ...
 
-    let currentWishId = "";
+    let selectedWishId = ""; // 当前选中的信件ID
 
-    // 1. 获取所有信件列表
-    async function listWishes() {
+    // 1. 获取愿望列表
+    async function fetchQuestion() {
         const name = document.getElementById('myName').value.trim();
         if(!name) return;
+        
         const res = await fetch(`/api/wish?name=${encodeURIComponent(name)}&type=list`);
         const wishes = await res.json();
         
-        const listDiv = document.getElementById('wishList');
+        const resultBox = document.getElementById('resultBox');
         if(wishes.length === 0) {
-            listDiv.innerHTML = "<p>空空如也...</p>";
+            resultBox.innerHTML = "<p>没有找到属于你的愿望。</p>";
             return;
         }
 
-        listDiv.innerHTML = wishes.map((w, index) => `
-            <div class="wish-chip" onclick="showVerify('${w.id}', '${w.question}')">
-                第 ${index + 1} 封信：${w.question}
-            </div>
-        `).join('');
-        document.getElementById('check-step1').style.display = 'none';
+        // 清空并显示问题列表
+        resultBox.innerHTML = '<p style="color:var(--accent); margin-bottom:10px;">点击以下问题进行解锁：</p>';
+        wishes.forEach((w, index) => {
+            const btn = document.createElement('div');
+            btn.className = 'msg-item';
+            btn.style.cursor = 'pointer';
+            btn.style.border = '1px solid var(--accent)';
+            btn.style.padding = '10px';
+            btn.innerText = `信件 ${index + 1}: ${w.question}`;
+            btn.onclick = () => {
+                selectedWishId = w.id;
+                document.getElementById('displayQuestion').innerText = "问题: " + w.question;
+                document.getElementById('check-step1').style.display = 'none';
+                document.getElementById('check-step2').style.display = 'block';
+                resultBox.innerHTML = ""; // 隐藏列表进入验证
+            };
+            resultBox.appendChild(btn);
+        });
     }
 
-    // 2. 点击某个信件，准备验证
-    function showVerify(id, q) {
-        currentWishId = id;
-        document.getElementById('activeQuestion').innerText = "挑战问题：" + q;
-        document.getElementById('verifyArea').style.display = 'block';
-        document.getElementById('activeAnswer').value = "";
-    }
-
-    // 3. 验证单封信件
-    async function unlockWish() {
-        const answer = document.getElementById('activeAnswer').value.trim();
+    // 2. 验证并开启单封信件
+    async function verifyAndRead() {
+        const answer = document.getElementById('myAnswer').value.trim();
         const name = document.getElementById('myName').value.trim();
-        const res = await fetch(`/api/wish?id=${encodeURIComponent(currentWishId)}&name=${encodeURIComponent(name)}&answer=${encodeURIComponent(answer)}&type=verify`);
+        
+        const res = await fetch(`/api/wish?name=${encodeURIComponent(name)}&id=${encodeURIComponent(selectedWishId)}&answer=${encodeURIComponent(answer)}&type=verify`);
         const data = await res.json();
         
         if(data.success) {
-            const msgDiv = document.createElement('div');
-            msgDiv.className = 'unlocked-msg';
-            msgDiv.innerText = `✨："${data.message}"`;
-            document.getElementById('resultBox').prepend(msgDiv); // 新解开的放在最上面
-            document.getElementById('verifyArea').style.display = 'none';
-            // 可选：从列表中移除已解开的项
-            const chips = document.querySelectorAll('.wish-chip');
-            chips.forEach(c => { if(c.innerText.includes(document.getElementById('activeQuestion').innerText.replace("挑战问题：",""))) c.style.display='none'; });
+            document.getElementById('check-step2').style.display = 'none';
+            // 显示内容，并提供返回按钮继续开启其他信件
+            document.getElementById('resultBox').innerHTML = `
+                <div class="msg-item" style="color:var(--gold); border-left:3px solid var(--gold);">"${data.message}"</div>
+                <button class="btn-main" onclick="location.reload()" style="background:var(--gold)">返回查看其他信件</button>
+            `;
         } else {
-            alert("答案错误！这封信还不能交给你。");
+            alert("答案错误！");
         }
     }
+    
+    // ... 保留烟花和音乐逻辑 ...
 </script>

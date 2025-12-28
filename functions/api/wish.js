@@ -5,7 +5,7 @@ export async function onRequest(context) {
     // --- 处理发送愿望 (POST) ---
     if (request.method === "POST") {
         const { to, question, answer, msg } = await request.json();
-        // 生成唯一 ID，确保每一封信都是独立的
+        // 为每一封信生成唯一标识符，防止覆盖
         const wishId = `wish:${to.toLowerCase().trim()}:${Date.now()}`;
         
         const payload = {
@@ -30,7 +30,7 @@ export async function onRequest(context) {
 
         if (!name) return new Response("Name required", { status: 400 });
 
-        // 第一步：列出该姓名下所有的“谜题”（问题列表）
+        // 步骤 A: 列出该姓名下所有的密保问题列表
         if (type === 'list') {
             const list = await env.WISH_STORAGE.list({ prefix: `wish:${name}` });
             const questions = await Promise.all(
@@ -44,7 +44,7 @@ export async function onRequest(context) {
             });
         }
 
-        // 第二步：验证特定信件的答案
+        // 步骤 B: 验证具体某封信的答案
         if (type === 'verify') {
             const userAnswer = url.searchParams.get('answer')?.toLowerCase().trim();
             const data = await env.WISH_STORAGE.get(wishId, { type: "json" });

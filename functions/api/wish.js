@@ -2,64 +2,44 @@ export async function onRequest(context) {
     const { request, env } = context;
     const url = new URL(request.url);
 
-    // --- 处理发送愿望 (POST) ---
+    // 发送愿望
     if (request.method === "POST") {
-        const { to, question, answer, msg } = await request.json();
-        // 为每一封信生成唯一标识符，防止覆盖
-        const wishId = `wish:${to.toLowerCase().trim()}:${Date.now()}`;
-        
-        const payload = {
-            id: wishId,
-            to: to.toLowerCase().trim(),
-            question: question,
-            answer: answer.toLowerCase().trim(),
-            message: msg
-        };
-        
-        await env.WISH_STORAGE.put(wishId, JSON.stringify(payload));
-        return new Response(JSON.stringify({ success: true }), {
-            headers: { "content-type": "application/json" }
-        });
+        try {
+            const { to, question, answer, msg } = await request.json();
+            const id = `wish:${to.toLowerCase().trim()}:${Date.now()}`;
+            const data = { id, to, question, answer: answer.toLowerCase().trim(), message: msg };
+            await env.WISH_STORAGE.put(id, JSON.stringify(data));
+            return new Response(JSON.stringify({ success: true }), { headers: { "Content-Type": "application/json" } });
+        } catch (e) {
+            return new Response(JSON.stringify({ error: e.message }), { status: 500 });
+        }
     }
 
-    // --- 处理读取愿望 (GET) ---
+    // 读取列表或验证
     if (request.method === "GET") {
         const name = url.searchParams.get('name')?.toLowerCase().trim();
         const type = url.searchParams.get('type');
-        const wishId = url.searchParams.get('id');
-
         if (!name) return new Response("Name required", { status: 400 });
 
-        // 步骤 A: 列出该姓名下所有的密保问题列表
+        // 获取该姓名下的所有信件列表
         if (type === 'list') {
             const list = await env.WISH_STORAGE.list({ prefix: `wish:${name}` });
-            const questions = await Promise.all(
-                list.keys.map(async (key) => {
-                    const val = await env.WISH_STORAGE.get(key.name, { type: "json" });
-                    return { id: key.name, question: val.question };
-                })
-            );
-            return new Response(JSON.stringify(questions), {
-                headers: { "content-type": "application/json" }
-            });
+            const questions = await Promise.all(list.keys.map(async (k) => {
+                const v = await env.WISH_STORAGE.get(k.name, { type: "json" });
+                return { id: k.name, question: v.question };
+            }));
+            return new Response(JSON.stringify(questions), { headers: { "Content-Type": "application/json" } });
         }
 
-        // 步骤 B: 验证具体某封信的答案
+        // 验证单封信件
         if (type === 'verify') {
-            const userAnswer = url.searchParams.get('answer')?.toLowerCase().trim();
-            const data = await env.WISH_STORAGE.get(wishId, { type: "json" });
-            
-            if (!data) return new Response("Not found", { status: 404 });
-            
-            if (userAnswer === data.answer) {
-                return new Response(JSON.stringify({ success: true, message: data.message }), {
-                    headers: { "content-type": "application/json" }
-                });
-            } else {
-                return new Response(JSON.stringify({ success: false }), {
-                    headers: { "content-type": "application/json" }
-                });
+            const id = url.searchParams.get('id');
+            const ans = url.searchParams.get('answer')?.toLowerCase().trim();
+            const data = await env.WISH_STORAGE.get(id, { type: "json" });
+            if (data && data.answer === ans) {
+                return new Response(JSON.stringify({ success: true, message: data.message }), { headers: { "Content-Type": "application/json" } });
             }
+            return new Response(JSON.stringify({ success: false }), { headers: { "Content-Type": "application/json" } });
         }
     }
 }

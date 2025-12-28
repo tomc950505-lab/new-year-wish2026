@@ -1,61 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2026新年 | 灵魂连接</title>
+    <style>
+        :root { --primary: #020205; --accent: #00f2fe; --gold: #fccb90; --glass: rgba(255, 255, 255, 0.05); }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background: var(--primary); color: white; font-family: sans-serif; overflow: hidden; }
+        #fwCanvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+        .ui-wrapper { position: relative; z-index: 10; height: 100vh; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+        .glass-card { background: var(--glass); backdrop-filter: blur(25px); padding: 2rem; border-radius: 30px; border: 1px solid rgba(255, 255, 255, 0.1); width: 350px; text-align: center; pointer-events: auto; }
+        .tab-btn { padding: 10px 20px; border: none; background: none; color: white; cursor: pointer; opacity: 0.6; }
+        .tab-btn.active { opacity: 1; border-bottom: 2px solid var(--accent); }
+        input, textarea { width: 100%; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; margin: 10px 0; padding: 10px; box-sizing: border-box; border-radius: 8px; }
+        .btn-main { width: 100%; padding: 12px; background: var(--accent); color: black; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .wish-item { border: 1px solid var(--accent); margin: 10px 0; padding: 10px; border-radius: 8px; cursor: pointer; background: rgba(0, 242, 254, 0.1); }
+    </style>
+</head>
+<body>
+<canvas id="fwCanvas"></canvas>
+<div class="ui-wrapper">
+    <div class="glass-card">
+        <h2>2026 愿望清单</h2>
+        <div style="margin-bottom:20px;">
+            <button class="tab-btn active" id="t-write" onclick="showTab('write')">写愿望</button>
+            <button class="tab-btn" id="t-read" onclick="showTab('read')">收信箱</button>
+        </div>
+
+        <div id="p-write">
+            <input type="text" id="to" placeholder="收信人姓名">
+            <input type="text" id="q" placeholder="密保问题">
+            <input type="text" id="a" placeholder="正确答案">
+            <textarea id="m" placeholder="留言内容"></textarea>
+            <button class="btn-main" onclick="postWish()">锁定并发送 ✨</button>
+        </div>
+
+        <div id="p-read" style="display:none;">
+            <div id="step-name">
+                <input type="text" id="myName" placeholder="输入你的姓名">
+                <button class="btn-main" onclick="loadList()">查找我的信件</button>
+            </div>
+            <div id="step-list" style="display:none;"></div>
+            <div id="step-verify" style="display:none;">
+                <p id="curQ" style="color:var(--accent)"></p>
+                <input type="text" id="myA" placeholder="输入答案">
+                <button class="btn-main" onclick="unlock()">解锁信件</button>
+            </div>
+            <div id="result" style="margin-top:20px; color:var(--gold); font-style:italic;"></div>
+        </div>
+    </div>
+</div>
+
 <script>
-    // ... 保留 switchTab 和 sendWish 函数 ...
-
-    let selectedWishId = ""; // 当前选中的信件ID
-
-    // 1. 获取愿望列表
-    async function fetchQuestion() {
-        const name = document.getElementById('myName').value.trim();
-        if(!name) return;
-        
-        const res = await fetch(`/api/wish?name=${encodeURIComponent(name)}&type=list`);
-        const wishes = await res.json();
-        
-        const resultBox = document.getElementById('resultBox');
-        if(wishes.length === 0) {
-            resultBox.innerHTML = "<p>没有找到属于你的愿望。</p>";
-            return;
-        }
-
-        // 清空并显示问题列表
-        resultBox.innerHTML = '<p style="color:var(--accent); margin-bottom:10px;">点击以下问题进行解锁：</p>';
-        wishes.forEach((w, index) => {
-            const btn = document.createElement('div');
-            btn.className = 'msg-item';
-            btn.style.cursor = 'pointer';
-            btn.style.border = '1px solid var(--accent)';
-            btn.style.padding = '10px';
-            btn.innerText = `信件 ${index + 1}: ${w.question}`;
-            btn.onclick = () => {
-                selectedWishId = w.id;
-                document.getElementById('displayQuestion').innerText = "问题: " + w.question;
-                document.getElementById('check-step1').style.display = 'none';
-                document.getElementById('check-step2').style.display = 'block';
-                resultBox.innerHTML = ""; // 隐藏列表进入验证
-            };
-            resultBox.appendChild(btn);
-        });
+    let activeId = "";
+    function showTab(t) {
+        document.getElementById('p-write').style.display = t==='write'?'block':'none';
+        document.getElementById('p-read').style.display = t==='read'?'block':'none';
+        document.getElementById('t-write').classList.toggle('active', t==='write');
+        document.getElementById('t-read').classList.toggle('active', t==='read');
     }
 
-    // 2. 验证并开启单封信件
-    async function verifyAndRead() {
-        const answer = document.getElementById('myAnswer').value.trim();
-        const name = document.getElementById('myName').value.trim();
-        
-        const res = await fetch(`/api/wish?name=${encodeURIComponent(name)}&id=${encodeURIComponent(selectedWishId)}&answer=${encodeURIComponent(answer)}&type=verify`);
+    async function postWish() {
+        const body = { to: document.getElementById('to').value, question: document.getElementById('q').value, answer: document.getElementById('a').value, msg: document.getElementById('m').value };
+        const res = await fetch('/api/wish', { method: 'POST', body: JSON.stringify(body) });
+        if(res.ok) { alert("发送成功！"); location.reload(); }
+    }
+
+    async function loadList() {
+        const name = document.getElementById('myName').value;
+        const res = await fetch(`/api/wish?type=list&name=${encodeURIComponent(name)}`);
         const data = await res.json();
-        
-        if(data.success) {
-            document.getElementById('check-step2').style.display = 'none';
-            // 显示内容，并提供返回按钮继续开启其他信件
-            document.getElementById('resultBox').innerHTML = `
-                <div class="msg-item" style="color:var(--gold); border-left:3px solid var(--gold);">"${data.message}"</div>
-                <button class="btn-main" onclick="location.reload()" style="background:var(--gold)">返回查看其他信件</button>
-            `;
-        } else {
-            alert("答案错误！");
-        }
+        const listDiv = document.getElementById('step-list');
+        listDiv.innerHTML = data.length ? data.map(i => `<div class="wish-item" onclick="goVerify('${i.id}','${i.question}')">问题：${i.question}</div>`).join('') : "暂无信件";
+        document.getElementById('step-name').style.display = 'none';
+        listDiv.style.display = 'block';
     }
-    
-    // ... 保留烟花和音乐逻辑 ...
+
+    function goVerify(id, q) {
+        activeId = id;
+        document.getElementById('curQ').innerText = q;
+        document.getElementById('step-list').style.display = 'none';
+        document.getElementById('step-verify').style.display = 'block';
+    }
+
+    async function unlock() {
+        const name = document.getElementById('myName').value;
+        const ans = document.getElementById('myA').value;
+        const res = await fetch(`/api/wish?type=verify&name=${name}&id=${activeId}&answer=${ans}`);
+        const data = await res.json();
+        if(data.success) {
+            document.getElementById('result').innerHTML += `<p>“${data.message}”</p>`;
+            document.getElementById('step-verify').style.display = 'none';
+            document.getElementById('step-list').style.display = 'block';
+        } else { alert("答案错误"); }
+    }
 </script>
+</body>
+</html>
